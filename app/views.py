@@ -81,20 +81,14 @@ def ClassicSignUP(request):
     if request.method == 'POST':
 
         if not request.user.is_authenticated():
-            with open('/home/ashwini/foo.txt', 'a') as f:
-                f.write(str(request.POST))
             form = ExtendedUserForm(request.POST)
             if form.is_valid():
-                with open('/home/ashwini/foo.txt', 'a') as f:
-                    f.write('Here\n')
                 user = form.save(commit=False)
                 user.set_password(form.cleaned_data['password'])
                 user.save()
                 login(request, authenticate(email=user.email, password=form.cleaned_data['password']))
                 return redirect('app:home')
             else:
-                with open('/home/ashwini/foo.txt', 'a') as f:
-                    f.write(str(form.errors))
                 return redirect('app:login')
         else:
             return redirect('app:login')
