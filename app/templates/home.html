@@ -1,0 +1,417 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="../../favicon.ico">
+
+    <title>RestRoom | Home</title>
+
+    <!-- Bootstrap core CSS -->
+   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css">
+   <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+   <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&libraries=places"></script>
+
+    <!-- Custom styles for this template -->
+    <style type="text/css">
+
+          /* Move down content because we have a fixed navbar that is 50px tall */
+      body {
+        padding-top: 50px;
+        padding-bottom: 20px;
+      }
+
+      html, body{
+        height: 100%;
+        margin: 0px;
+        padding: 0px
+      }
+
+        #map-canvas{
+          height: 800px;
+          width: 100%;
+        }
+      .controls {
+          margin-top: 16px;
+          border: 1px solid transparent;
+          border-radius: 2px 0 0 2px;
+          box-sizing: border-box;
+          -moz-box-sizing: border-box;
+          height: 32px;
+          outline: none;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        #pac-input {
+ /*         background-color: #fff;
+          padding: 0 11px 0 13px;
+          width: 400px;
+          font-family: Roboto;
+          font-size: 15px;
+          font-weight: 300;
+          text-overflow: ellipsis;*/
+        }
+
+        #pac-input:focus {
+          border-color: #4d90fe;
+          margin-left: -1px;
+          padding-left: 14px;  /* Regular padding-left + 1. */
+          width: 401px;
+        }
+
+        .pac-container {
+          font-family: Roboto;
+        }
+
+        #type-selector {
+          color: #fff;
+          background-color: #4d90fe;
+          padding: 5px 11px 0px 11px;
+        }
+
+        #type-selector label {
+          font-family: Roboto;
+          font-size: 13px;
+          font-weight: 300;
+        }
+
+      #target {
+        width: 345px;
+      }
+    .container {
+      width: 100%;
+    }
+
+    </style>
+
+  </head>
+
+  <body>
+
+    <nav class="navbar navbar-inverse navbar-static-top">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="#">Hello, {{user.first_name}} {{user.last_name}}</a>
+        </div>
+        <div id="navbar" class="navbar-collapse collapse">
+          <form class="navbar-form navbar-right">
+            <div class="form-group">
+              <!-- <input type="text" id="pac-input" class="controls"> -->
+            </div>
+            <img src="http://i.imgur.com/67I6mTq.gif" style="display:none" id="gif-loader">
+            <img src="http://provennutritionforkids.com/wp-content/uploads/2012/10/Green-CheckMark.png" style="display:none" id="gif-done">
+            <a href="#" class="btn btn-success" id="update-location">Update location</a>
+            <a href="#" class="btn btn-success" id="detect-location" tooltip="Detect and save location">Detect & save</a>
+            <a href="#" class="btn btn-success" id="explore">Explore</a>
+            <a href="{% url 'app:logout' %}" class="btn btn-success">Logout</a>
+          </form>
+        </div><!--/.navbar-collapse -->
+      </div>
+    </nav>
+
+    <div class="container">
+      <!-- <input id="pac-input" class="controls" type="text" placeholder="Search Box"> -->
+      <input id="pac-input" class="controls" type="text" placeholder="Search Box">
+      <div id="map-canvas"></div>
+    </div>
+
+    <script>
+
+    var latitude, longitude, map, infowindow, marker;
+
+    function getCookie(name) {
+        var cookieValue = null;
+        if (document.cookie && document.cookie != '') {
+            var cookies = document.cookie.split(';');
+            for (var i = 0; i < cookies.length; i++) {
+                var cookie = jQuery.trim(cookies[i]);
+                // Does this cookie string begin with the name we want?
+                if (cookie.substring(0, name.length + 1) == (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    var csrftoken = getCookie('csrftoken');
+
+    function saveLocation(){
+
+        if(marker !== undefined){
+
+          console.log('Current location is Lat: ' + marker.position.k + ' Long: ' + marker.position.D);
+          console.log('Now updating....')
+
+          $('#gif-loader').show()
+
+          $.ajax({
+            url: "{% url 'app:updatelatlng' %}",
+            type: 'POST',
+            data: {csrfmiddlewaretoken:csrftoken,
+                   lat: marker.position.k,
+                   lng: marker.position.D,
+                   placename: marker.custom_info.placename,
+                   address: marker.custom_info.address
+                 },
+            success: function(data) {
+              console.log(data);
+              latitude = marker.position.k;
+              longitude = marker.position.D;
+              $('#gif-loader').hide();
+              $('#gif-done').show();  
+              $( "#gif-done" ).fadeOut(1000);
+
+            },
+            error: function(e) {
+              console.log('error');
+              console.log(e.toString());
+            }
+          });
+        }
+        else{
+
+          alert('Oops! no marker found on the map. Please select a location first.')
+
+        }
+
+      }
+
+
+    $(document).ready(function(){
+
+      $('#explore').click(function(){
+        if(latitude && longitude){
+          window.location = "{% url 'app:explore' %}";
+        }
+        else{
+          alert('You must save a location first to explore other people nearby.')
+        }
+
+      });
+
+      $('#update-location').click(saveLocation);
+
+      $('#detect-location').click(function(){
+        SetLocation();
+      })
+
+    });
+
+    function updateinfoWindow(latlng, callback, geolocate){
+
+      var geocoder = new google.maps.Geocoder();
+
+      geocoder.geocode({
+            "latLng": latlng
+        }, function (results, status) {
+            console.log(results, status);
+            if (status == google.maps.GeocoderStatus.OK) {
+                console.log(results);
+                var address_components = results[0].address_components;
+                var placeName = address_components[0].long_name;
+                
+                var address = '';
+                address += results[0].formatted_address || '';
+
+                marker.custom_info.placename = placeName;
+                marker.custom_info.address = address;
+
+                infowindow.setContent('<div><strong>' + placeName + '</strong><br>' + address);
+                infowindow.open(map, marker);
+                if(callback){
+                  callback(geolocate);
+                }
+            }
+        });
+
+    }
+
+    function SetDbLocation(){
+
+      console.log('Running SetDbLocation');
+      marker.setVisible(false);
+      infowindow.close();
+
+      latitude = {{user.lat}};
+      longitude = {{user.lang}};
+
+      var geolocate = new google.maps.LatLng(latitude, longitude);
+
+      marker.custom_info.placename = '{{user.placename}}';
+      marker.custom_info.address = '{{user.address}}';
+
+      marker.setPosition(geolocate);
+      marker.setVisible(true);
+      if (marker.custom_info.address || marker.custom_info.placename){
+        infowindow.setContent('<div><strong>' +  marker.custom_info.placename + '</strong><br>' + marker.custom_info.address);
+        infowindow.open(map, marker);
+      }
+      
+      // updateinfoWindow(geolocate);
+      // infowindow.open(map, marker); 
+      map.setCenter(geolocate);
+      map.setZoom(17)
+
+    }
+
+
+    function setLocationOnFailure(){
+
+          var geolocate = new google.maps.LatLng(23.42154524119965, 79.00593125);
+          marker.setPosition(geolocate);
+          marker.setVisible(true);
+          var callback = function(geolocate){
+            map.setCenter(geolocate);
+            map.setZoom(17)
+            saveLocation();
+          }
+          updateinfoWindow(geolocate, callback, geolocate);
+
+
+
+    }
+
+
+    function SetLocation(){
+
+        console.log('Running SetLocation');
+
+        marker.setVisible(false);
+        infowindow.close();
+
+        if(!!navigator.geolocation) {
+                
+                    navigator.geolocation.getCurrentPosition(function(position) {
+
+                      console.log(position);
+
+                        var latitude = position.coords.latitude;
+                        var longitude = position.coords.longitude;
+                    
+                        var geolocate = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+                        
+                        marker.setPosition(geolocate);
+                        marker.setVisible(true);
+                        updateinfoWindow(geolocate);
+                        // infowindow.open(map, marker); 
+
+                        map.setCenter(geolocate);
+                        map.setZoom(17)
+                        saveLocation();
+                    }, function(err){
+                        if(err.code == 1){
+                          alert("As you're not allowing us to read your location, you'll have to find it yourself using either using the search box or drag the marker around.");
+                          setLocationOnFailure();
+                        }
+                      
+                    });
+        }
+        else{
+
+          alert("Guess what, geolocation is not possible on your broswer. You'll have to find it yourself using either using the search box or drag the marker around.")
+          setLocationOnFailure()
+
+         }
+
+    }
+
+
+    function initialize() {
+
+      console.log('Running initialize');
+
+
+      map = new google.maps.Map(document.getElementById('map-canvas'), {
+        mapTypeId: google.maps.MapTypeId.ROADMAP,
+        zoom: 17
+      });
+
+      var input = /** @type {HTMLInputElement} */(
+          document.getElementById('pac-input'));
+      map.controls[google.maps.ControlPosition.TOP_LEFT].push(input);
+
+      var autocomplete = new google.maps.places.Autocomplete(input);
+      autocomplete.bindTo('bounds', map);
+
+      infowindow = new google.maps.InfoWindow();
+
+      marker = new google.maps.Marker({
+        map: map,
+        anchorPoint: new google.maps.Point(0, -29),
+        draggable:true,
+        animation: google.maps.Animation.DROP,
+        title:"Drag me to exact location!"
+      });
+
+      marker.custom_info = {placename:'', address: ''};
+
+      google.maps.event.addListener(marker, 'dragend', function () {
+
+        var lat = marker.position.k;
+        var lng = marker.position.D;
+
+        console.log('Guess what, someone dragged me!')
+        var latlng = new google.maps.LatLng(lat, lng);
+        updateinfoWindow(latlng);
+
+      });
+
+      google.maps.event.addListener(autocomplete, 'place_changed', function() {
+
+        infowindow.close();
+        marker.setVisible(false);
+        var place = autocomplete.getPlace();
+        if (!place.geometry) {
+          return;
+        }
+
+        console.log(place.geometry.viewport);
+
+        // If the place has a geometry, then present it on a map.
+        if (place.geometry.viewport) {
+          map.fitBounds(place.geometry.viewport);
+        } else {
+          map.setCenter(place.geometry.location);
+          map.setZoom(17);  // Why 17? Because it looks good.
+        }
+        marker.setPosition(place.geometry.location);
+        marker.setVisible(true);
+
+        var address = '';
+
+        address +=  place.formatted_address || '';
+
+        marker.custom_info.placename = place.name;
+        marker.custom_info.address = address;
+
+        infowindow.setContent('<div><strong>' + place.name + '</strong><br>' + address);
+        infowindow.open(map, marker);
+
+      });
+
+    }
+
+    google.maps.event.addDomListener(window, 'load', initialize);
+    {% if user.lat == 0 and user.lang == 0 %}
+    google.maps.event.addDomListener(window, 'load', SetLocation);
+    {% else %}
+    google.maps.event.addDomListener(window, 'load', SetDbLocation);
+    {% endif%}
+
+    </script>
+
+  </body>
+</html>
+
