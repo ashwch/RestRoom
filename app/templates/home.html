@@ -304,12 +304,14 @@
                         
                         marker.setPosition(geolocate);
                         marker.setVisible(true);
-                        updateinfoWindow(geolocate);
-                        // infowindow.open(map, marker); 
+                        var callback = function(geolocate){
+                          //Database query is too fast for Geocoder
+                          map.setCenter(geolocate);
+                          map.setZoom(17)
+                          saveLocation();
+                        }
+                        updateinfoWindow(geolocate, callback, geolocate);
 
-                        map.setCenter(geolocate);
-                        map.setZoom(17)
-                        saveLocation();
                     }, function(err){
                         if(err.code == 1){
                           alert("As you're not allowing us to read your location, you'll have to find it yourself using either using the search box or drag the marker around.");
